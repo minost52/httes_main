@@ -14,16 +14,18 @@ type MainPage struct {
 	progressText *widget.Label
 	isDarkMode   bool
 	window       fyne.Window // Добавляем ссылку на окно
+	icon         fyne.Resource
 }
 
 // NewMainPage создаёт новый экземпляр MainPage.
-func NewMainPage(app fyne.App, resultOutput *widget.TextGrid, window fyne.Window) *MainPage {
+func NewMainPage(app fyne.App, resultOutput *widget.TextGrid, window fyne.Window, icon fyne.Resource) *MainPage {
 	mp := &MainPage{
 		app:          app,
 		resultOutput: resultOutput,
 		progressBar:  widget.NewProgressBar(),
 		progressText: widget.NewLabel("Request Avg Duration 0.000s"),
 		window:       window, // Сохраняем ссылку на окно
+		icon:         icon,
 	}
 	mp.progressBar.Max = 100.0
 	return mp

@@ -1,18 +1,18 @@
 package ui
 
 import (
+	"bytes"
 	"fmt"
 	"httes/store"
+	"math"
 	"math/rand"
 	"sort"
 	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -24,28 +24,29 @@ type Metric struct {
 }
 
 type LoadTestUI struct {
-	isRunning    bool
-	uiUpdateChan chan uiUpdate
-	startBtn     *widget.Button
-	stopBtn      *widget.Button
-	app          fyne.App
-	window       fyne.Window
-	resultOutput *widget.TextGrid
-	progressBar  *widget.ProgressBar
-	progressText *widget.Label
+	isRunning       bool
+	uiUpdateChan    chan uiUpdate
+	startBtn        *widget.Button
+	stopBtn         *widget.Button
+	app             fyne.App
+	window          fyne.Window
+	resultOutput    *widget.TextGrid
+	progressBar     *widget.ProgressBar
+	progressText    *widget.Label
+	chartsContainer *fyne.Container // Добавляем поле для контейнера с графиками
+	uiUpdaterOnce   sync.Once
 }
 
 type uiUpdate struct {
-	errMsg       string
-	outputText   string
-	startEnabled bool
-	stopEnabled  bool
-	status       string  // "loading", "completed", или "" для сброса
-	progress     float64 // Добавлено для прогресса
-	progressText string  // текст для Request Avg Duration
+	errMsg        string
+	outputText    string
+	startEnabled  bool
+	stopEnabled   bool
+	status        string  // "loading", "completed", или "" для сброса
+	progress      float64 // Добавлено для прогресса
+	progressText  string  // текст для Request Avg Duration
+	refreshCharts bool
 }
-
-var uiUpdaterOnce sync.Once
 
 func NewLoadTestUI(app fyne.App, window fyne.Window) *LoadTestUI {
 	resultOutput := widget.NewTextGrid()
@@ -53,21 +54,19 @@ func NewLoadTestUI(app fyne.App, window fyne.Window) *LoadTestUI {
 	progressBar.Min = 0.0
 	progressBar.Max = 100.0
 	progressText := widget.NewLabel("Request Avg Duration 0.000s")
-	loadingIcon := widget.NewProgressBarInfinite()
-	loadingIcon.Hide()
-	checkIcon := canvas.NewImageFromResource(theme.ConfirmIcon())
-	checkIcon.FillMode = canvas.ImageFillContain
-	checkIcon.SetMinSize(fyne.NewSize(24, 24))
-	checkIcon.Hide()
+
+	// Создаем контейнер с графиками
+	chartsContainer := container.NewVBox() // или другой контейнер, который вы используете для графиков
 
 	ui := &LoadTestUI{
-		app:          app,
-		window:       window,
-		resultOutput: resultOutput,
-		progressBar:  progressBar,
-		progressText: progressText,
-		startBtn:     widget.NewButton("Start Load Test", nil),
-		stopBtn:      widget.NewButton("Stop", nil),
+		app:             app,
+		window:          window,
+		resultOutput:    resultOutput,
+		progressBar:     progressBar,
+		progressText:    progressText,
+		startBtn:        widget.NewButton("Start Load Test", nil),
+		stopBtn:         widget.NewButton("Stop", nil),
+		chartsContainer: chartsContainer, // Сохраняем ссылку на контейнер
 	}
 	ui.stopBtn.Disable()
 	ui.initUIUpdater()
@@ -75,7 +74,7 @@ func NewLoadTestUI(app fyne.App, window fyne.Window) *LoadTestUI {
 }
 
 func (ui *LoadTestUI) initUIUpdater() {
-	uiUpdaterOnce.Do(func() {
+	ui.uiUpdaterOnce.Do(func() {
 		ui.uiUpdateChan = make(chan uiUpdate, 1000)
 		go func() {
 			defer func() {
@@ -113,6 +112,10 @@ func (ui *LoadTestUI) initUIUpdater() {
 					ui.progressBar.SetValue(update.progress)
 					ui.progressBar.Refresh()
 				}
+				// Добавляем обработку refreshCharts
+				if update.refreshCharts && ui.chartsContainer != nil {
+					ui.chartsContainer.Refresh()
+				}
 			}
 		}()
 	})
@@ -129,7 +132,6 @@ func (ui *LoadTestUI) safeUpdateUI(update uiUpdate) {
 	} else if ui.stopBtn != nil && !update.stopEnabled {
 		ui.stopBtn.Disable()
 	}
-
 	select {
 	case ui.uiUpdateChan <- update:
 	default:
@@ -141,6 +143,10 @@ func (ui *LoadTestUI) safeUpdateUI(update uiUpdate) {
 		}
 		if update.progressText != "" && ui.progressText != nil {
 			ui.progressText.SetText(update.progressText)
+		}
+		// Добавляем обработку refreshCharts в случае переполнения канала
+		if update.refreshCharts && ui.chartsContainer != nil {
+			ui.chartsContainer.Refresh()
 		}
 	}
 }
@@ -176,7 +182,7 @@ func (ui *LoadTestUI) setupStartButton() {
 		}
 		ui.isRunning = true
 
-		// Очистка результатов перед началом нового теста
+		// Очистка результатов и метрик перед началом нового теста
 		if ui.resultOutput != nil {
 			ui.resultOutput.SetText("")
 		}
@@ -185,6 +191,20 @@ func (ui *LoadTestUI) setupStartButton() {
 		}
 		if ui.progressText != nil {
 			ui.safeUpdateUI(uiUpdate{progressText: "Request Avg Duration 0.000s"})
+		}
+
+		// Сбрасываем метрики с блокировкой
+		GlobalMetrics.mu.Lock()
+		GlobalMetrics.Times = []float64{0, 1}
+		GlobalMetrics.RPS = []float64{0, 0}
+		GlobalMetrics.RespTimes = []float64{0, 0}
+		GlobalMetrics.Errors = []float64{0, 0}
+		GlobalMetrics.mu.Unlock()
+
+		// Очищаем канал обновлений
+		select {
+		case <-GlobalMetrics.updateChan:
+		default:
 		}
 
 		reqCountVal, err := parseInt(reqCount.Text)
@@ -218,7 +238,7 @@ func (ui *LoadTestUI) setupStartButton() {
 				ui.safeUpdateUI(uiUpdate{
 					startEnabled: true,
 					stopEnabled:  false,
-					status:       "completed", // Устанавливаем completed в конце
+					status:       "",
 					progress:     100.0,
 					progressText: "Request Avg Duration 0.000s",
 				})
@@ -226,6 +246,13 @@ func (ui *LoadTestUI) setupStartButton() {
 
 			totalDuration := 0.0
 			var metrics []Metric
+			startTime := time.Now()
+
+			// Переменные для подсчёта RPS и времени отклика
+			var requestCount int
+			var lastUpdateTime time.Time = startTime
+			var requestsInWindow int
+			var windowStartTime time.Time = startTime
 
 			for i := 0; i < reqCountVal; i++ {
 				if !ui.isRunning {
@@ -237,13 +264,14 @@ func (ui *LoadTestUI) setupStartButton() {
 						outputText:   currentOutput + "\n🛑 Тест остановлен пользователем.",
 						startEnabled: true,
 						stopEnabled:  false,
-						status:       "", // Сбрасываем статус при остановке
+						status:       "",
 						progress:     0.0,
 						progressText: "Request Avg Duration 0.000s",
 					})
 					return
 				}
 
+				// Генерация метрик для каждого запроса
 				metrics = []Metric{
 					{Name: "DNS", Duration: 10.50 + rand.Float64()*5, Order: 1},
 					{Name: "Connection", Duration: 20.75 + rand.Float64()*10, Order: 2},
@@ -257,33 +285,70 @@ func (ui *LoadTestUI) setupStartButton() {
 				}
 				metrics = append(metrics, Metric{Name: "Total", Duration: totalDuration, Order: 7})
 
+				// Сортировка по порядку
 				sort.Slice(metrics, func(i, j int) bool {
 					return metrics[i].Order < metrics[j].Order
 				})
 
+				// Обновление прогресса
 				progress := float64(i+1) * 100.0 / float64(reqCountVal)
-				avgDuration := (totalDuration / 1000.0) / float64(i+1)
+				avgDuration := totalDuration / 1000.0 / float64(i+1) // Среднее в секундах
 				progressText := fmt.Sprintf("Request Avg Duration %.3fs", avgDuration)
 
-				// Сохраняем status: "loading" для промежуточных обновлений
+				// Сбор метрик для графиков
+				currentTime := time.Now()
+				elapsedSeconds := currentTime.Sub(startTime).Seconds()
+				requestCount++
+				requestsInWindow++
+
+				// Обновляем метрики каждую секунду
+				if currentTime.Sub(lastUpdateTime).Seconds() >= 1.0 {
+					rps := float64(requestsInWindow) / currentTime.Sub(windowStartTime).Seconds()
+
+					// Проверяем, что avgDuration корректно вычислено
+					if math.IsNaN(avgDuration) || math.IsInf(avgDuration, 0) {
+						avgDuration = 0
+					}
+
+					GlobalMetrics.AddData(
+						[]float64{elapsedSeconds},     // Новые значения времени
+						[]float64{rps},                // Новые значения RPS
+						[]float64{avgDuration * 1000}, // Новые значения времени отклика
+						[]float64{0},                  // Новые значения ошибок
+					)
+
+					// Сбрасываем счётчик и время окна
+					requestsInWindow = 0
+					windowStartTime = currentTime
+					lastUpdateTime = currentTime
+				}
+
 				ui.safeUpdateUI(uiUpdate{
 					progress:     progress,
 					progressText: progressText,
 					startEnabled: false,
 					stopEnabled:  true,
-					status:       "loading", // Добавляем status
 				})
 
-				time.Sleep(time.Duration(50+rand.Intn(50)) * time.Millisecond)
+				// Увеличенная задержка для обеспечения обновления каждую секунду
+				time.Sleep(time.Duration(200+rand.Intn(100)) * time.Millisecond)
 			}
 
-			resultOutput := "Results:\n"
+			// Формирование итогового вывода
+			var resultOutput bytes.Buffer
+			resultOutput.WriteString("=== Результаты теста ===\n")
 			for _, metric := range metrics {
-				resultOutput += fmt.Sprintf("%s: %.2fms\n", metric.Name, metric.Duration)
+				resultOutput.WriteString(fmt.Sprintf("%s: %.2fms\n", metric.Name, metric.Duration))
 			}
+			resultOutput.WriteString("\n=== Итоговые метрики ===\n")
+			resultOutput.WriteString(fmt.Sprintf("Общее время: %.2fсек\n", time.Since(startTime).Seconds()))
+			resultOutput.WriteString(fmt.Sprintf("Среднее время запроса: %.2fms\n", totalDuration/float64(reqCountVal)))
+			resultOutput.WriteString(fmt.Sprintf("Всего запросов: %d\n", reqCountVal))
+
 			avgDuration := totalDuration / 1000.0 / float64(reqCountVal)
 			finalProgressText := fmt.Sprintf("Request Avg Duration %.3fs", avgDuration)
 
+			// Добавление TestRun
 			store.AddTestRun(store.TestRun{
 				ID:        store.TestRunCount() + 1,
 				Name:      fmt.Sprintf("Test Run %d", store.TestRunCount()+1),
@@ -291,13 +356,15 @@ func (ui *LoadTestUI) setupStartButton() {
 				Status:    "Completed",
 			})
 
+			// Показать результаты и обновить графики
 			ui.safeUpdateUI(uiUpdate{
-				outputText:   resultOutput,
-				progress:     100.0,
-				progressText: finalProgressText,
-				status:       "completed",
-				startEnabled: true,
-				stopEnabled:  false,
+				outputText:    resultOutput.String(),
+				progress:      100.0,
+				progressText:  finalProgressText,
+				status:        "completed",
+				startEnabled:  true,
+				stopEnabled:   false,
+				refreshCharts: true, // Добавляем флаг для обновления графиков
 			})
 		}()
 	}

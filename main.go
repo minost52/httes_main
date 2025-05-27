@@ -12,10 +12,10 @@ import (
 
 func main() {
 	myApp := app.New()
-	myApp.Settings().SetTheme(theme.LightTheme())
+	myApp.Settings().SetTheme(theme.DarkTheme())
 	window := myApp.NewWindow("Httes")
 	// Загружаем иконку
-	icon, err := fyne.LoadResourceFromPath("ui/logo.png")
+	icon, err := fyne.LoadResourceFromPath("ui/logo2.png")
 	if err != nil {
 		log.Println("Ошибка загрузки иконки:", err)
 	} else {
@@ -23,10 +23,10 @@ func main() {
 	}
 
 	resultOutput := widget.NewTextGrid()
-	mp := ui.NewMainPage(myApp, resultOutput, window) // Добавляем window как третий аргумент
+	// Передаем иконку в NewMainPage
+	mp := ui.NewMainPage(myApp, resultOutput, window, icon)
 	content := mp.CreateUI(window)
 
-	// Устанавливаем начальный размер окна
 	window.SetContent(content)
 	window.CenterOnScreen()
 	window.Resize(fyne.NewSize(970, 600))

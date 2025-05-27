@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"httes/store"
 	"image/color"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -103,17 +105,17 @@ func (mp *MainPage) createScenariosScreen(window fyne.Window, tabs *container.Ap
 	}{
 		{
 			Name:        "API User Flow",
-			CreatedAt:   time.Date(2023, 5, 15, 14, 30, 0, 0, time.UTC),
+			CreatedAt:   time.Date(2025, 5, 20, 14, 30, 0, 0, time.UTC),
 			Description: "Полный цикл работы с пользователями (CRUD)",
 		},
 		{
 			Name:        "Auth Stress Test",
-			CreatedAt:   time.Date(2023, 5, 20, 9, 15, 0, 0, time.UTC),
+			CreatedAt:   time.Date(2025, 5, 10, 9, 15, 0, 0, time.UTC),
 			Description: "Тестирование нагрузки на эндпоинты аутентификации",
 		},
 		{
 			Name:        "Payment Validation",
-			CreatedAt:   time.Date(2023, 6, 1, 16, 45, 0, 0, time.UTC),
+			CreatedAt:   time.Date(2025, 4, 10, 16, 45, 0, 0, time.UTC),
 			Description: "Проверка валидации платежных данных",
 		},
 	}
@@ -150,6 +152,9 @@ func (mp *MainPage) createScenariosScreen(window fyne.Window, tabs *container.Ap
 	// Кнопка создания нового сценария
 	newScenarioBtn := widget.NewButtonWithIcon("Новый сценарий", theme.ContentAddIcon(), func() {
 		scenarioWindow := mp.app.NewWindow("Создать новый сценарий")
+		if mp.icon != nil {
+			scenarioWindow.SetIcon(mp.icon) // Устанавливаем иконку
+		}
 		scenarioWindow.SetContent(mp.createScenarioEditorContent(scenarioWindow))
 		scenarioWindow.Resize(fyne.NewSize(800, 600))
 		scenarioWindow.Show()
@@ -165,7 +170,7 @@ func (mp *MainPage) createScenariosScreen(window fyne.Window, tabs *container.Ap
 				nil,
 				container.NewHBox(
 					widget.NewButtonWithIcon("", theme.MediaPlayIcon(), nil),
-					widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), nil),
+					widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), nil), // OnTapped set in update function
 					widget.NewButtonWithIcon("", theme.DeleteIcon(), nil),
 				),
 				container.NewVBox(
@@ -200,9 +205,21 @@ func (mp *MainPage) createScenariosScreen(window fyne.Window, tabs *container.Ap
 
 			// Настраиваем кнопки
 			buttons := container.Objects[1].(*fyne.Container)
+			// Кнопка воспроизведения
+			buttons.Objects[0].(*widget.Button).OnTapped = func() {
+				// Логика воспроизведения (оставляем без изменений)
+			}
+
 			// Кнопка редактирования
+			// In the list update function of createScenariosScreen
 			buttons.Objects[1].(*widget.Button).OnTapped = func() {
-				tabs.SelectIndex(3)
+				editWindow := mp.app.NewWindow("Редактирование сценария")
+				if mp.icon != nil {
+					editWindow.SetIcon(mp.icon) // Устанавливаем иконку
+				}
+				editWindow.SetContent(mp.editScenarioEditorContent(id, window))
+				editWindow.Resize(fyne.NewSize(970, 600))
+				editWindow.Show()
 			}
 
 			// Кнопка удаления
@@ -306,9 +323,9 @@ func (mp *MainPage) createTestRunScreen(window fyne.Window, tabs *container.AppT
 	resultHeader := container.NewBorder(
 		nil,
 		nil,
-		widget.NewLabel("Результаты теста"), // Текст слева
+		widget.NewLabel("Результаты теста"),
 		widget.NewButtonWithIcon("История тестов", theme.HistoryIcon(), func() {
-			tabs.SelectTabIndex(3) // Предполагая, что вкладка истории имеет индекс 2
+			tabs.SelectTabIndex(3)
 		}),
 		nil,
 	)
@@ -324,18 +341,23 @@ func (mp *MainPage) createTestRunScreen(window fyne.Window, tabs *container.AppT
 		resultsBox,
 	))
 
-	right := container.NewVBox(
-		container.NewVBox(
-			widget.NewLabelWithStyle("Метрики теста", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-			widget.NewSeparator(),
-			CreateLoadTestCharts(),
-		),
+	// Правая часть — графики
+	chartContainer := CreateLoadTestCharts()
+	chartBox := container.NewVBox(
+		widget.NewLabelWithStyle("Метрики теста", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewSeparator(),
+		chartContainer,
 	)
+	chartBoxContainer := container.NewVScroll(chartBox)
+	chartBoxContainer.SetMinSize(fyne.NewSize(300, 200))
+
+	// Сохраняем ссылку на контейнер графиков в UI
+	ui.chartsContainer = chartBox
 
 	layout := container.NewHBox(
 		left,
 		widget.NewSeparator(),
-		right,
+		chartBoxContainer,
 	)
 
 	return layout
@@ -361,77 +383,39 @@ func (mp *MainPage) createScenariosSection(tabs *container.AppTabs) fyne.CanvasO
 	)
 }
 
-// func (mp *MainPage) createLoadProfilesScreen(window fyne.Window) fyne.CanvasObject {
-// 	// Список профилей
-// 	list := widget.NewList(
-// 		func() int { return store.LoadProfileCount() },
-// 		func() fyne.CanvasObject {
-// 			return container.NewHBox(
-// 				widget.NewLabel("Template"),
-// 				widget.NewButton("Редактировать", nil),
-// 			)
-// 		},
-// 		func(id widget.ListItemID, item fyne.CanvasObject) {
-// 			profile := store.GetLoadProfile(id)
-// 			container := item.(*fyne.Container)
-// 			container.Objects[0].(*widget.Label).SetText(profile.Name)
-// 			container.Objects[1].(*widget.Button).OnTapped = func() {
-// 				dialog.ShowInformation("Редактирование",
-// 					fmt.Sprintf("Редактирование профиля %s", profile.Name),
-// 					window)
-// 			}
-// 		},
-// 	)
-
-// 	// Форма редактирования
-// 	nameEntry := widget.NewEntry()
-// 	nameEntry.PlaceHolder = "Название профиля"
-
-// 	typeSelect := widget.NewSelect([]string{"Constant", "Incremental"}, nil)
-// 	typeSelect.PlaceHolder = "Тип профиля"
-
-// 	configEntry := widget.NewMultiLineEntry()
-// 	configEntry.PlaceHolder = "JSON конфигурация"
-// 	configEntry.SetMinRowsVisible(3)
-
-// 	saveBtn := widget.NewButtonWithIcon("Сохранить", theme.DocumentSaveIcon(), func() {
-// 		if nameEntry.Text == "" {
-// 			dialog.ShowInformation("Ошибка", "Введите название профиля", window)
-// 			return
-// 		}
-
-// 		store.AddLoadProfile(store.LoadProfile{
-// 			ID:   store.LoadProfileCount() + 1,
-// 			Name: nameEntry.Text,
-// 			Type: typeSelect.Selected,
-// 		})
-// 		dialog.ShowInformation("Сохранено", "Профиль сохранён", window)
-
-// 		// Сброс формы
-// 		nameEntry.SetText("")
-// 		typeSelect.ClearSelected()
-// 		configEntry.SetText("")
-// 	})
-
-// 	// Основной layout
-// 	return container.NewPadded(
-// 		container.NewVBox(
-// 			container.NewVScroll(list),
-// 			widget.NewSeparator(),
-// 			widget.NewLabel("Новый профиль:"),
-// 			nameEntry,
-// 			typeSelect,
-// 			configEntry,
-// 			container.NewCenter(saveBtn),
-// 		),
-// 	)
-// }
-
 func (mp *MainPage) createScenarioEditorContent(window fyne.Window) fyne.CanvasObject {
+	// Создаем контейнеры для сообщений об ошибках
+	nameError := widget.NewLabel("")
+	nameError.Hide()
+	nameError.TextStyle = fyne.TextStyle{Bold: true}
+	nameErrorLabel := canvas.NewText("(проверьте корректность)", color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+	nameErrorLabel.Hide()
+
+	urlError := widget.NewLabel("")
+	urlError.Hide()
+	urlErrorLabel := canvas.NewText("(проверьте корректность)", color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+	urlErrorLabel.Hide()
+
+	jsonError := widget.NewLabel("")
+	jsonError.Hide()
+	jsonErrorLabel := canvas.NewText("(проверьте корректность)", color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+	jsonErrorLabel.Hide()
+
 	// Поля сценария
 	nameEntry := widget.NewEntry()
 	nameEntry.SetPlaceHolder("Тестирование эндпоинтов /users")
 	nameEntry.SetText("")
+	nameEntry.OnChanged = func(s string) {
+		if strings.TrimSpace(s) == "" {
+			nameError.SetText("(проверьте корректность)")
+			nameError.Show()
+			nameErrorLabel.Show()
+		} else {
+			nameError.SetText("")
+			nameError.Hide()
+			nameErrorLabel.Hide()
+		}
+	}
 
 	descEntry := widget.NewEntry()
 	descEntry.SetPlaceHolder("Проверка работы GET, POST, PUT, DELETE, PATCH")
@@ -442,17 +426,34 @@ func (mp *MainPage) createScenarioEditorContent(window fyne.Window) fyne.CanvasO
 
 	jsonEditor := widget.NewMultiLineEntry()
 	jsonEditor.SetPlaceHolder(`Например: {
-  "steps": [
-    {
-      "name": "Create user",
-      "request": {
-        "method": "POST",
-        "url": "/users"
-      }
-    }
-  ]
+"steps": [
+{
+  "name": "Create user",
+  "request": {
+	"method": "POST",
+	"url": "/users"
+  }
+}
+]
 }`)
 	jsonEditor.SetMinRowsVisible(6)
+	jsonEditor.OnChanged = func(s string) {
+		if s != "" {
+			var js map[string]interface{}
+			if err := json.Unmarshal([]byte(s), &js); err != nil {
+				jsonError.Show()
+				jsonErrorLabel.Show()
+			} else {
+				jsonError.SetText("")
+				jsonError.Hide()
+				jsonErrorLabel.Hide()
+			}
+		} else {
+			jsonError.SetText("")
+			jsonError.Hide()
+			jsonErrorLabel.Hide()
+		}
+	}
 
 	// Список конечных точек
 	var endpoints []store.Endpoint
@@ -460,7 +461,22 @@ func (mp *MainPage) createScenarioEditorContent(window fyne.Window) fyne.CanvasO
 	endpointURL := widget.NewEntry()
 	endpointURL.SetPlaceHolder(`https://api.example.com/users`)
 	endpointURL.SetMinRowsVisible(3)
-
+	endpointURL.OnChanged = func(s string) {
+		if s != "" {
+			if _, err := url.ParseRequestURI(s); err != nil {
+				urlError.Show()
+				urlErrorLabel.Show()
+			} else {
+				urlError.SetText("")
+				urlError.Hide()
+				urlErrorLabel.Hide()
+			}
+		} else {
+			urlError.SetText("")
+			urlError.Hide()
+			urlErrorLabel.Hide()
+		}
+	}
 	endpointHeaders := widget.NewMultiLineEntry()
 	endpointHeaders.SetPlaceHolder(`Например: {
   "Content-Type": "application/json",
@@ -559,20 +575,29 @@ func (mp *MainPage) createScenarioEditorContent(window fyne.Window) fyne.CanvasO
 	// Левая колонка
 	leftPanel := container.NewVBox(
 		widget.NewLabelWithStyle("Создание сценария", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabel("Название:"),
+		container.NewHBox(
+			widget.NewLabel("Название:"),
+			container.NewHBox(nameError, nameErrorLabel),
+		),
 		nameEntry,
 		widget.NewLabel("Описание:"),
 		descEntry,
 		widget.NewLabel("Профиль нагрузки:"),
 		profileSelect,
-		widget.NewLabelWithStyle("JSON сценария:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		container.NewHBox(
+			widget.NewLabelWithStyle("JSON сценария:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+			container.NewHBox(jsonError, jsonErrorLabel),
+		),
 		jsonEditor,
 	)
 
 	// Правая колонка
 	rightPanel := container.NewVBox(
-		widget.NewLabelWithStyle("Конечные точки", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewLabel("URL:"),
+		widget.NewLabel(""),
+		container.NewHBox(
+			widget.NewLabel("URL:"),
+			container.NewHBox(urlError, urlErrorLabel),
+		),
 		endpointURL,
 		widget.NewLabel("Заголовки (JSON):"),
 		endpointHeaders,
@@ -580,7 +605,6 @@ func (mp *MainPage) createScenarioEditorContent(window fyne.Window) fyne.CanvasO
 		container.NewHBox(selectCertBtn, certLabel),
 		container.NewHBox(selectKeyBtn, keyLabel),
 	)
-
 	// Контейнер 2 колонки
 	content := container.NewGridWithColumns(2, leftPanel, rightPanel)
 
@@ -784,3 +808,421 @@ func (mp *MainPage) createHistoryScreen(window fyne.Window, tabs *container.AppT
 		),
 	)
 }
+
+func (mp *MainPage) editScenarioEditorContent(scenarioIndex int, parentWindow fyne.Window) fyne.CanvasObject {
+	// 1. Модель данных сценариев
+	scenarios := []struct {
+		Name        string
+		CreatedAt   time.Time
+		Description string
+		Profile     string
+		JSON        string
+		Endpoints   []store.Endpoint
+		Cert        *store.Cert
+	}{
+		{
+			Name:        "API User Flow",
+			CreatedAt:   time.Date(2025, 5, 15, 14, 30, 0, 0, time.UTC),
+			Description: "Полный цикл работы с пользователями (CRUD)",
+			Profile:     "Linear",
+			JSON: `{
+"steps": [
+{
+  "name": "Create user",
+  "request": {
+    "method": "POST",
+    "url": "/users"
+  }
+}
+]
+}`,
+			Endpoints: []store.Endpoint{
+				{
+					URL:     "https://api.example.com/users",
+					Headers: `{"Content-Type": "application/json"}`,
+				},
+			},
+			Cert: nil,
+		},
+		{
+			Name:        "Auth Stress Test",
+			CreatedAt:   time.Date(2025, 5, 20, 9, 15, 0, 0, time.UTC),
+			Description: "Тестирование нагрузки на эндпоинты аутентификации",
+			Profile:     "Waved",
+			JSON: `{
+"steps": [
+{
+  "name": "Login",
+  "request": {
+    "method": "POST",
+    "url": "/auth/login"
+  }
+}
+]
+}`,
+			Endpoints: []store.Endpoint{
+				{
+					URL:     "https://api.example.com/auth",
+					Headers: `{"Authorization": "Bearer token"}`,
+				},
+			},
+			Cert: &store.Cert{
+				Name: "auth_cert.pem",
+				Path: "/certs/auth_cert.pem",
+				Key:  "/certs/auth_key.pem",
+			},
+		},
+		{
+			Name:        "Payment Validation",
+			CreatedAt:   time.Date(2025, 6, 1, 16, 45, 0, 0, time.UTC),
+			Description: "Проверка валидации платежных данных",
+			Profile:     "Incremental",
+			JSON: `{
+"steps": [
+{
+  "name": "Validate payment",
+  "request": {
+    "method": "POST",
+    "url": "/payments/validate"
+  }
+}
+]
+}`,
+			Endpoints: []store.Endpoint{
+				{
+					URL:     "https://api.example.com/payments",
+					Headers: `{"Content-Type": "application/json"}`,
+				},
+			},
+			Cert: nil,
+		},
+	}
+
+	// 2. Проверка валидности индекса сценария
+	if scenarioIndex < 0 || scenarioIndex >= len(scenarios) {
+		return widget.NewLabel("Ошибка: Неверный индекс сценария")
+	}
+	scenario := scenarios[scenarioIndex]
+
+	// 3. Контейнеры для сообщений об ошибках
+	nameError := widget.NewLabel("")
+	nameError.Hide()
+	nameError.TextStyle = fyne.TextStyle{Bold: true}
+	nameErrorLabel := canvas.NewText("(проверьте корректность)", color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+	nameErrorLabel.Hide()
+
+	urlError := widget.NewLabel("")
+	urlError.Hide()
+	urlErrorLabel := canvas.NewText("(проверьте корректность)", color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+	urlErrorLabel.Hide()
+
+	jsonError := widget.NewLabel("")
+	jsonError.Hide()
+	jsonErrorLabel := canvas.NewText("(проверьте корректность)", color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+	jsonErrorLabel.Hide()
+
+	// 4. Поля сценария
+	nameEntry := widget.NewEntry()
+	nameEntry.SetPlaceHolder("Тестирование эндпоинтов /users")
+	nameEntry.SetText(scenario.Name)
+	nameEntry.OnChanged = func(s string) {
+		if strings.TrimSpace(s) == "" {
+			nameError.SetText("(проверьте корректность)")
+			nameError.Show()
+			nameErrorLabel.Show()
+		} else {
+			nameError.SetText("")
+			nameError.Hide()
+			nameErrorLabel.Hide()
+		}
+	}
+
+	descEntry := widget.NewEntry()
+	descEntry.SetPlaceHolder("Проверка работы GET, POST, PUT, DELETE, PATCH")
+	descEntry.SetText(scenario.Description)
+
+	profileSelect := widget.NewSelect([]string{"Linear", "Incremental", "Waved"}, nil)
+	profileSelect.SetSelected(scenario.Profile)
+
+	jsonEditor := widget.NewMultiLineEntry()
+	jsonEditor.SetPlaceHolder(`Например: {
+"steps": [
+{
+  "name": "Create user",
+  "request": {
+    "method": "POST",
+    "url": "/users"
+  }
+}
+]
+}`)
+	jsonEditor.SetText(scenario.JSON)
+	jsonEditor.MultiLine = true
+	jsonEditor.Wrapping = fyne.TextWrapWord
+	jsonEditor.Resize(fyne.NewSize(450, 150)) // Adjusted for ~6 rows
+	jsonEditor.OnChanged = func(s string) {
+		if s != "" {
+			var js map[string]interface{}
+			if err := json.Unmarshal([]byte(s), &js); err != nil {
+				jsonError.Show()
+				jsonErrorLabel.Show()
+			} else {
+				jsonError.SetText("")
+				jsonError.Hide()
+				jsonErrorLabel.Hide()
+			}
+		} else {
+			jsonError.SetText("")
+			jsonError.Hide()
+			jsonErrorLabel.Hide()
+		}
+	}
+
+	// 5. Список конечных точек
+	endpointURL := widget.NewEntry()
+	endpointURL.SetPlaceHolder(`https://api.example.com/users`)
+	endpointURL.Resize(fyne.NewSize(450, 80)) // Adjusted for ~3 rows
+	if len(scenario.Endpoints) > 0 {
+		endpointURL.SetText(scenario.Endpoints[0].URL)
+	}
+	endpointURL.OnChanged = func(s string) {
+		if s != "" {
+			if _, err := url.ParseRequestURI(s); err != nil {
+				urlError.Show()
+				urlErrorLabel.Show()
+			} else {
+				urlError.SetText("")
+				urlError.Hide()
+				urlErrorLabel.Hide()
+			}
+		} else {
+			urlError.SetText("")
+			urlError.Hide()
+			urlErrorLabel.Hide()
+		}
+	}
+
+	endpointHeaders := widget.NewMultiLineEntry()
+	endpointHeaders.SetPlaceHolder(`Например: {
+  "Content-Type": "application/json",
+  "Authorization": "Bearer token"
+}`)
+	endpointHeaders.Resize(fyne.NewSize(450, 80)) // Adjusted for ~3 rows
+	if len(scenario.Endpoints) > 0 {
+		endpointHeaders.SetText(scenario.Endpoints[0].Headers)
+	}
+
+	// 6. Сертификаты
+	certPath := widget.NewEntry()
+	certPath.SetPlaceHolder("Путь к сертификату (например: /path/to/cert.pem)")
+	certPath.Disable()
+	certKeyPath := widget.NewEntry()
+	certKeyPath.SetPlaceHolder("Путь к ключу (например: /path/to/key.pem)")
+	certKeyPath.Disable()
+
+	certLabel := widget.NewLabel("Не выбрано")
+	keyLabel := widget.NewLabel("Не выбрано")
+	if scenario.Cert != nil {
+		certPath.SetText(scenario.Cert.Path)
+		certKeyPath.SetText(scenario.Cert.Key)
+		certLabel.SetText(scenario.Cert.Name)
+		keyLabel.SetText(scenario.Cert.Name)
+	}
+
+	var selectedCert *store.Cert
+
+	certFilter := storage.NewExtensionFileFilter([]string{".crt", ".pem"})
+	keyFilter := storage.NewExtensionFileFilter([]string{".key"})
+
+	selectCertBtn := widget.NewButton("Выбрать сертификат", func() {
+		fileDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+			if err == nil && reader != nil {
+				certPath.SetText(reader.URI().Path())
+				certLabel.SetText(reader.URI().Name())
+				reader.Close()
+			}
+		}, parentWindow)
+		fileDialog.SetFilter(certFilter)
+		fileDialog.Show()
+	})
+
+	selectKeyBtn := widget.NewButton("Выбрать ключ", func() {
+		fileDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+			if err == nil && reader != nil {
+				certKeyPath.SetText(reader.URI().Path())
+				keyLabel.SetText(reader.URI().Name())
+				reader.Close()
+			}
+		}, parentWindow)
+		fileDialog.SetFilter(keyFilter)
+		fileDialog.Show()
+	})
+
+	// 7. Кнопка "Сохранить"
+	saveBtn := widget.NewButton("Сохранить сценарий", func() {
+		if strings.TrimSpace(nameEntry.Text) == "" {
+			dialog.NewInformation("Ошибка", "Название сценария обязательно", parentWindow).Show()
+			return
+		}
+
+		// Формируем список конечных точек
+		var endpoints []store.Endpoint
+		if endpointURL.Text != "" {
+			endpoints = append(endpoints, store.Endpoint{
+				URL:     strings.TrimSpace(endpointURL.Text),
+				Headers: endpointHeaders.Text,
+			})
+		}
+
+		// Обработка сертификата
+		if certPath.Text != "" && certKeyPath.Text != "" {
+			selectedCert = &store.Cert{
+				Name: certLabel.Text,
+				Path: certPath.Text,
+				Key:  certKeyPath.Text,
+			}
+		}
+
+		// Обновляем сценарий
+		scenarios[scenarioIndex] = struct {
+			Name        string
+			CreatedAt   time.Time
+			Description string
+			Profile     string
+			JSON        string
+			Endpoints   []store.Endpoint
+			Cert        *store.Cert
+		}{
+			Name:        nameEntry.Text,
+			Description: descEntry.Text,
+			CreatedAt:   time.Now(),
+			Profile:     profileSelect.Selected,
+			JSON:        jsonEditor.Text,
+			Endpoints:   endpoints,
+			Cert:        selectedCert,
+		}
+
+		dialog.NewInformation("Сценарий", "Сценарий обновлён", parentWindow).Show()
+		parentWindow.Close()
+	})
+
+	// 8. Кнопка "Отмена"
+	cancelBtn := widget.NewButton("Отмена", func() {
+		parentWindow.Close()
+	})
+
+	// 9. Левая колонка
+	leftPanel := container.NewVBox(
+		widget.NewLabelWithStyle("Редактирование сценария", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		container.NewHBox(
+			widget.NewLabel("Название:"),
+			container.NewHBox(nameError, nameErrorLabel),
+		),
+		nameEntry,
+		widget.NewLabel("Описание:"),
+		descEntry,
+		widget.NewLabel("Профиль нагрузки:"),
+		profileSelect,
+		container.NewHBox(
+			widget.NewLabelWithStyle("JSON сценария:", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+			container.NewHBox(jsonError, jsonErrorLabel),
+		),
+		jsonEditor,
+	)
+
+	// 10. Правая колонка
+	rightPanel := container.NewVBox(
+		widget.NewLabel(""),
+		container.NewHBox(
+			widget.NewLabel("URL:"),
+			container.NewHBox(urlError, urlErrorLabel),
+		),
+		endpointURL,
+		widget.NewLabel("Заголовки (JSON):"),
+		endpointHeaders,
+		widget.NewLabelWithStyle("Сертификаты", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		container.NewHBox(selectCertBtn, certLabel),
+		container.NewHBox(selectKeyBtn, keyLabel),
+	)
+
+	// 11. Контейнер с двумя колонками
+	content := container.NewGridWithColumns(2, leftPanel, rightPanel)
+
+	// 12. Основной контейнер с контентом и кнопками
+	mainContent := container.NewVBox(
+		content,
+		widget.NewSeparator(),
+		container.NewCenter(
+			container.NewHBox(saveBtn, cancelBtn),
+		),
+	)
+
+	// 13. Обёртка с фиксированным размером
+	return container.NewCenter(container.NewGridWrap(fyne.NewSize(970, 550), mainContent))
+}
+
+// func (mp *MainPage) createLoadProfilesScreen(window fyne.Window) fyne.CanvasObject {
+// 	// Список профилей
+// 	list := widget.NewList(
+// 		func() int { return store.LoadProfileCount() },
+// 		func() fyne.CanvasObject {
+// 			return container.NewHBox(
+// 				widget.NewLabel("Template"),
+// 				widget.NewButton("Редактировать", nil),
+// 			)
+// 		},
+// 		func(id widget.ListItemID, item fyne.CanvasObject) {
+// 			profile := store.GetLoadProfile(id)
+// 			container := item.(*fyne.Container)
+// 			container.Objects[0].(*widget.Label).SetText(profile.Name)
+// 			container.Objects[1].(*widget.Button).OnTapped = func() {
+// 				dialog.ShowInformation("Редактирование",
+// 					fmt.Sprintf("Редактирование профиля %s", profile.Name),
+// 					window)
+// 			}
+// 		},
+// 	)
+
+// 	// Форма редактирования
+// 	nameEntry := widget.NewEntry()
+// 	nameEntry.PlaceHolder = "Название профиля"
+
+// 	typeSelect := widget.NewSelect([]string{"Constant", "Incremental"}, nil)
+// 	typeSelect.PlaceHolder = "Тип профиля"
+
+// 	configEntry := widget.NewMultiLineEntry()
+// 	configEntry.PlaceHolder = "JSON конфигурация"
+// 	configEntry.SetMinRowsVisible(3)
+
+// 	saveBtn := widget.NewButtonWithIcon("Сохранить", theme.DocumentSaveIcon(), func() {
+// 		if nameEntry.Text == "" {
+// 			dialog.ShowInformation("Ошибка", "Введите название профиля", window)
+// 			return
+// 		}
+
+// 		store.AddLoadProfile(store.LoadProfile{
+// 			ID:   store.LoadProfileCount() + 1,
+// 			Name: nameEntry.Text,
+// 			Type: typeSelect.Selected,
+// 		})
+// 		dialog.ShowInformation("Сохранено", "Профиль сохранён", window)
+
+// 		// Сброс формы
+// 		nameEntry.SetText("")
+// 		typeSelect.ClearSelected()
+// 		configEntry.SetText("")
+// 	})
+
+// 	// Основной layout
+// 	return container.NewPadded(
+// 		container.NewVBox(
+// 			container.NewVScroll(list),
+// 			widget.NewSeparator(),
+// 			widget.NewLabel("Новый профиль:"),
+// 			nameEntry,
+// 			typeSelect,
+// 			configEntry,
+// 			container.NewCenter(saveBtn),
+// 		),
+// 	)
+// }
