@@ -208,56 +208,6 @@ func (r *guiReport) getAvgDuration() float32 {
 	return r.result.ProgressPoints[lastMilestone]
 }
 
-// // В guiReport.go
-// func (r *guiReport) GetProgressData() (float64, float64) {
-// 	totalProcessed := float32(r.result.SuccessCount + r.result.FailedCount)
-// 	percent := float32(0)
-// 	if r.totalRequests > 0 {
-// 		percent = (totalProcessed / float32(r.totalRequests)) * 100
-// 		if percent > 100 {
-// 			percent = 100
-// 		}
-// 	}
-// 	fmt.Println("Progress Data:", totalProcessed, percent) // Отладка
-// 	return float64(totalProcessed), float64(percent)
-// }
-
-// func (r *guiReport) GetDurationData() ([]string, []float32) {
-// 	var durationList []duration
-// 	for d, s := range r.result.Durations {
-// 		dur, ok := keyToStr[d]
-// 		if !ok {
-// 			dur = duration{name: d, order: 999}
-// 		}
-// 		dur.duration = s
-// 		durationList = append(durationList, dur)
-// 	}
-// 	for _, dur := range keyToStr {
-// 		found := false
-// 		for _, d := range durationList {
-// 			if d.name == dur.name {
-// 				found = true
-// 				break
-// 			}
-// 		}
-// 		if !found {
-// 			durationList = append(durationList, duration{name: dur.name, duration: 0, order: dur.order})
-// 		}
-// 	}
-// 	sort.Slice(durationList, func(i, j int) bool {
-// 		return durationList[i].order < durationList[j].order
-// 	})
-
-// 	x := make([]string, len(durationList))
-// 	y := make([]float32, len(durationList))
-// 	for i, v := range durationList {
-// 		x[i] = v.name
-// 		y[i] = v.duration
-// 	}
-// 	fmt.Println("Duration Data:", x, y) // Отладка
-// 	return x, y
-// }
-
 // printDetails выводит итоговый результат
 func (r *guiReport) printDetails() {
 	if r.resultGrid == nil || r.result == nil {

@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -24,6 +25,126 @@ var (
 	certPathEntry    *widget.Entry
 	certKeyPathEntry *widget.Entry
 )
+
+func (mp *ControlPage) createTestRunScreen(window fyne.Window, tabs *container.AppTabs) fyne.CanvasObject {
+	// Инициализация UI-компонентов
+	if mp.progressBar == nil {
+		mp.progressBar = widget.NewProgressBar()
+		mp.progressBar.Min = 0.0
+		mp.progressBar.Max = 100.0
+	}
+	if mp.progressText == nil {
+		mp.progressText = widget.NewLabel("Request Avg Duration 0.000s")
+	}
+	if mp.resultOutput == nil {
+		mp.resultOutput = widget.NewTextGrid()
+	}
+
+	ui := NewLoadTestUI(mp.app, window)
+	ui.resultOutput = mp.resultOutput
+	ui.progressBar = mp.progressBar
+	ui.progressText = mp.progressText
+
+	// Верхняя панель управления
+	var controls *fyne.Container
+	if mp.role != "intern" {
+		controls = container.NewVBox(
+			widget.NewSeparator(),
+			createURLSection(),
+			createParamsSection(),
+			container.NewHBox(createProxySection(), createCertFields(window)),
+			mp.createScenariosSection(tabs),
+			widget.NewSeparator(),
+			ui.CreateButtons(),
+			widget.NewSeparator(),
+			container.NewHBox(
+				container.NewGridWrap(fyne.NewSize(400, 30), ui.progressBar),
+				ui.progressText,
+			),
+		)
+	} else {
+		controls = container.NewVBox(
+			widget.NewSeparator(),
+			createURLSection(),
+			createParamsSection(),
+			container.NewHBox(createProxySection(), createCertFields(window)),
+			widget.NewSeparator(),
+			ui.CreateButtons(),
+			widget.NewSeparator(),
+			container.NewHBox(
+				container.NewGridWrap(fyne.NewSize(400, 30), ui.progressBar),
+				ui.progressText,
+			),
+		)
+	}
+
+	// Результаты
+	results := container.NewVScroll(ui.resultOutput)
+	results.SetMinSize(fyne.NewSize(300, 150))
+
+	// Создаем заголовок с текстом и кнопкой истории
+	resultHeader := container.NewBorder(
+		nil,
+		nil,
+		widget.NewLabel("Результаты теста"),
+		widget.NewButtonWithIcon("История тестов", theme.HistoryIcon(), func() {
+			tabs.SelectTabIndex(3)
+		}),
+		nil,
+	)
+
+	resultsBox := container.NewVBox(
+		resultHeader,
+		results,
+	)
+
+	left := container.NewVBox(container.NewVBox(
+		controls,
+		widget.NewSeparator(),
+		resultsBox,
+	))
+
+	// Правая часть — графики
+	chartContainer := CreateLoadTestCharts()
+	chartBox := container.NewVBox(
+		widget.NewLabelWithStyle("Метрики теста", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewSeparator(),
+		chartContainer,
+	)
+	chartBoxContainer := container.NewVScroll(chartBox)
+	chartBoxContainer.SetMinSize(fyne.NewSize(300, 200))
+
+	// Сохраняем ссылку на контейнер графиков в UI
+	ui.chartsContainer = chartBox
+
+	layout := container.NewHBox(
+		left,
+		widget.NewSeparator(),
+		chartBoxContainer,
+	)
+
+	return layout
+}
+
+func (mp *ControlPage) createScenariosSection(tabs *container.AppTabs) fyne.CanvasObject {
+	// Создаем метку для отображения выбранного сценария
+	scenarioLabel := widget.NewLabel("Сценарий не выбран")
+	scenarioLabel.Wrapping = fyne.TextTruncate
+
+	// Кнопка для выбора сценария
+	selectBtn := widget.NewButtonWithIcon("Выбрать сценарий", theme.NavigateNextIcon(), func() {
+		tabs.SelectIndex(2)
+	})
+
+	// "API" с эффектом гиперссылки (подчеркнуто и синим цветом)
+	apiText := widget.NewHyperlink("API", nil)
+
+	return container.NewHBox(
+		selectBtn,
+		apiText,
+		scenarioLabel,
+	)
+}
 
 func createURLSection() *fyne.Container {
 	methodSelect = widget.NewSelect([]string{"GET", "POST"}, nil)

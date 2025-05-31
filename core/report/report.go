@@ -15,9 +15,6 @@ type ReportService interface {
 	Init(debug bool) error
 	Start(input chan *types.ScenarioResult)
 	Stop()
-	// // Добавляем новые методы для получения данных графиков
-	// GetProgressData() (float64, float64)    // Возвращает (processed, percent)
-	// GetDurationData() ([]string, []float32) // Возвращает (stages, durations)
 }
 
 // NewReportService создаёт новый сервис отчётов с поддержкой прогресс-бара, текста и totalRequests

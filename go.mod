@@ -12,6 +12,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/tidwall/gjson v1.14.4
 	github.com/wcharczuk/go-chart/v2 v2.1.2
+	golang.org/x/crypto v0.33.0
 	golang.org/x/net v0.35.0
 )
 
