@@ -12,20 +12,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-var (
-	methodSelect     *widget.Select
-	protocolSelect   *widget.Select
-	urlEntry         *widget.Entry
-	proxyEntry       *widget.Entry
-	reqCount         *widget.Entry
-	duration         *widget.Entry
-	loadType         *widget.RadioGroup
-	usernameEntry    *widget.Entry
-	passwordEntry    *widget.Entry
-	certPathEntry    *widget.Entry
-	certKeyPathEntry *widget.Entry
-)
-
 func (mp *ControlPage) createTestRunScreen(window fyne.Window, tabs *container.AppTabs) fyne.CanvasObject {
 	// Инициализация UI-компонентов
 	if mp.progressBar == nil {
@@ -50,9 +36,9 @@ func (mp *ControlPage) createTestRunScreen(window fyne.Window, tabs *container.A
 	if mp.role != "intern" {
 		controls = container.NewVBox(
 			widget.NewSeparator(),
-			createURLSection(),
-			createParamsSection(),
-			container.NewHBox(createProxySection(), createCertFields(window)),
+			mp.createURLSection(),
+			mp.createParamsSection(),
+			container.NewHBox(mp.createProxySection(), mp.createCertFields(window)),
 			mp.createScenariosSection(tabs),
 			widget.NewSeparator(),
 			ui.CreateButtons(),
@@ -65,9 +51,9 @@ func (mp *ControlPage) createTestRunScreen(window fyne.Window, tabs *container.A
 	} else {
 		controls = container.NewVBox(
 			widget.NewSeparator(),
-			createURLSection(),
-			createParamsSection(),
-			container.NewHBox(createProxySection(), createCertFields(window)),
+			mp.createURLSection(),
+			mp.createParamsSection(),
+			container.NewHBox(mp.createProxySection(), mp.createCertFields(window)),
 			widget.NewSeparator(),
 			ui.CreateButtons(),
 			widget.NewSeparator(),
@@ -139,92 +125,220 @@ func (mp *ControlPage) createScenariosSection(tabs *container.AppTabs) fyne.Canv
 	// "API" с эффектом гиперссылки (подчеркнуто и синим цветом)
 	apiText := widget.NewHyperlink("API", nil)
 
-	return container.NewHBox(
+	// Кнопка крестика для удаления "API"
+	closeBtn := widget.NewButtonWithIcon("", theme.CancelIcon(), nil)
+	closeBtn.Importance = widget.LowImportance // Делаем кнопку менее заметной
+
+	// Контейнер для динамического управления
+	scenarioContainer := container.NewHBox(
 		selectBtn,
 		apiText,
+		closeBtn,
 		scenarioLabel,
 	)
+
+	// Функция для отключения полей
+	disableFields := func() {
+		if mp.methodSelect != nil {
+			mp.methodSelect.Disable()
+		}
+		if mp.protocolSelect != nil {
+			mp.protocolSelect.Disable()
+		}
+		if mp.urlEntry != nil {
+			mp.urlEntry.Disable()
+		}
+		if mp.proxyEntry != nil {
+			mp.proxyEntry.Disable()
+		}
+		if mp.reqCount != nil {
+			mp.reqCount.Disable()
+		}
+		if mp.duration != nil {
+			mp.duration.Disable()
+		}
+		if mp.loadType != nil {
+			mp.loadType.Disable()
+		}
+		if mp.usernameEntry != nil {
+			mp.usernameEntry.Disable()
+		}
+		if mp.passwordEntry != nil {
+			mp.passwordEntry.Disable()
+		}
+		if mp.certPathEntry != nil {
+			mp.certPathEntry.Disable()
+		}
+		if mp.certKeyPathEntry != nil {
+			mp.certKeyPathEntry.Disable()
+		}
+		if mp.selectCertButton != nil {
+			mp.selectCertButton.Disable()
+		}
+		if mp.selectKeyButton != nil {
+			mp.selectKeyButton.Disable()
+		}
+	}
+
+	// Функция для включения полей
+	enableFields := func() {
+		if mp.methodSelect != nil {
+			mp.methodSelect.Enable()
+		}
+		if mp.protocolSelect != nil {
+			mp.protocolSelect.Enable()
+		}
+		if mp.urlEntry != nil {
+			mp.urlEntry.Enable()
+		}
+		if mp.proxyEntry != nil {
+			mp.proxyEntry.Enable()
+		}
+		if mp.reqCount != nil {
+			mp.reqCount.Enable()
+		}
+		if mp.duration != nil {
+			mp.duration.Enable()
+		}
+		if mp.loadType != nil {
+			mp.loadType.Enable()
+		}
+		if mp.usernameEntry != nil {
+			mp.usernameEntry.Enable()
+		}
+		if mp.passwordEntry != nil {
+			mp.passwordEntry.Enable()
+		}
+		if mp.certPathEntry != nil {
+			if mp.certPathEntry.Disabled() {
+				mp.certPathEntry.Enable()
+			}
+		}
+		if mp.certKeyPathEntry != nil {
+			if mp.certKeyPathEntry.Disabled() {
+				mp.certKeyPathEntry.Enable()
+			}
+		}
+		if mp.selectCertButton != nil {
+			mp.selectCertButton.Enable()
+		}
+		if mp.selectKeyButton != nil {
+			mp.selectKeyButton.Enable()
+		}
+	}
+
+	// Обработчик для крестика
+	closeBtn.OnTapped = func() {
+		// Удаляем текст "API" и скрываем кнопку
+		apiText.SetText("")
+		closeBtn.Hide()
+		// Включаем поля
+		enableFields()
+		// Обновляем контейнер
+		scenarioContainer.Refresh()
+	}
+
+	// Добавляем обработчик для отображения крестика и отключения полей при выборе "API"
+	apiText.OnTapped = func() {
+		if apiText.Text == "" {
+			apiText.SetText("API")
+			closeBtn.Show()
+			// Отключаем поля
+			disableFields()
+			scenarioContainer.Refresh()
+		}
+	}
+
+	// Синхронизация состояния при инициализации
+	if apiText.Text != "" {
+		closeBtn.Show()
+		disableFields()
+	} else {
+		closeBtn.Hide()
+	}
+
+	return scenarioContainer
 }
 
-func createURLSection() *fyne.Container {
-	methodSelect = widget.NewSelect([]string{"GET", "POST"}, nil)
-	methodSelect.SetSelected("GET")
+func (mp *ControlPage) createURLSection() *fyne.Container {
+	mp.methodSelect = widget.NewSelect([]string{"GET", "POST"}, nil)
+	mp.methodSelect.SetSelected("GET")
 
-	protocolSelect = widget.NewSelect([]string{"HTTP", "HTTPS"}, nil)
-	protocolSelect.SetSelected("HTTPS")
+	mp.protocolSelect = widget.NewSelect([]string{"HTTP", "HTTPS"}, nil)
+	mp.protocolSelect.SetSelected("HTTPS")
 
-	urlEntry = widget.NewEntry()
-	urlEntry.SetText("example.com")
+	mp.urlEntry = widget.NewEntry()
+	mp.urlEntry.SetText("example.com")
 
 	return container.NewHBox(
-		container.NewGridWrap(fyne.NewSize(80, methodSelect.MinSize().Height), methodSelect),
-		container.NewGridWrap(fyne.NewSize(100, protocolSelect.MinSize().Height), protocolSelect),
-		container.NewGridWrap(fyne.NewSize(250, urlEntry.MinSize().Height), urlEntry),
+		container.NewGridWrap(fyne.NewSize(80, mp.methodSelect.MinSize().Height), mp.methodSelect),
+		container.NewGridWrap(fyne.NewSize(100, mp.protocolSelect.MinSize().Height), mp.protocolSelect),
+		container.NewGridWrap(fyne.NewSize(250, mp.urlEntry.MinSize().Height), mp.urlEntry),
 	)
 }
 
-func createProxySection() *fyne.Container {
-	proxyEntry = widget.NewEntry()
-	proxyEntry.SetPlaceHolder("http://127.0.0.1:8080")
+func (mp *ControlPage) createProxySection() *fyne.Container {
+	mp.proxyEntry = widget.NewEntry()
+	mp.proxyEntry.SetPlaceHolder("http://127.0.0.1:8080")
 	return container.NewVBox(
 		widget.NewLabel("Proxy (необязательно)"),
-		container.NewGridWrap(fyne.NewSize(250, proxyEntry.MinSize().Height), proxyEntry),
+		container.NewGridWrap(fyne.NewSize(250, mp.proxyEntry.MinSize().Height), mp.proxyEntry),
 	)
 }
 
-func createParamsSection() *fyne.Container {
-	reqCount = widget.NewEntry()
-	reqCount.SetText("10")
+func (mp *ControlPage) createParamsSection() *fyne.Container {
+	mp.reqCount = widget.NewEntry()
+	mp.reqCount.SetText("10")
 
-	duration = widget.NewEntry()
-	duration.SetText("1")
+	mp.duration = widget.NewEntry()
+	mp.duration.SetText("1")
 
-	loadType = widget.NewRadioGroup([]string{"Linear", "Incremental", "Waved"}, nil)
-	loadType.SetSelected("Linear")
+	mp.loadType = widget.NewRadioGroup([]string{"Linear", "Incremental", "Waved"}, nil)
+	mp.loadType.SetSelected("Linear")
 
-	usernameEntry = widget.NewEntry()
-	usernameEntry.SetPlaceHolder("Username")
+	mp.usernameEntry = widget.NewEntry()
+	mp.usernameEntry.SetPlaceHolder("Username")
 
-	passwordEntry = widget.NewEntry()
-	passwordEntry.SetPlaceHolder("Password")
-	passwordEntry.Password = true
+	mp.passwordEntry = widget.NewEntry()
+	mp.passwordEntry.SetPlaceHolder("Password")
+	mp.passwordEntry.Password = true
 
 	authAccordion := widget.NewAccordion(widget.NewAccordionItem("Basic Auth", container.NewVBox(
-		usernameEntry,
-		passwordEntry,
+		mp.usernameEntry,
+		mp.passwordEntry,
 	)))
 
-	reqCount.OnChanged = func(s string) {
+	mp.reqCount.OnChanged = func(s string) {
 		if _, err := parseInt(s); err != nil {
-			reqCount.SetText("10")
+			mp.reqCount.SetText("10")
 		}
 	}
-	duration.OnChanged = func(s string) {
+	mp.duration.OnChanged = func(s string) {
 		if _, err := parseInt(s); err != nil {
-			duration.SetText("1")
+			mp.duration.SetText("1")
 		}
 	}
 
 	return container.NewHBox(
 		container.NewGridWrap(
-			fyne.NewSize(120, widget.NewLabel("Request Count*").MinSize().Height+reqCount.MinSize().Height),
+			fyne.NewSize(120, widget.NewLabel("Request Count*").MinSize().Height+mp.reqCount.MinSize().Height),
 			container.NewVBox(
 				widget.NewLabel("Request Count*"),
-				reqCount,
+				mp.reqCount,
 			),
 		),
 		container.NewGridWrap(
-			fyne.NewSize(120, widget.NewLabel("Duration (s)*").MinSize().Height+duration.MinSize().Height),
+			fyne.NewSize(120, widget.NewLabel("Duration (s)*").MinSize().Height+mp.duration.MinSize().Height),
 			container.NewVBox(
 				widget.NewLabel("Duration (s)*"),
-				duration,
+				mp.duration,
 			),
 		),
 		container.NewGridWrap(
-			fyne.NewSize(120, widget.NewLabel("Load Type*").MinSize().Height+loadType.MinSize().Height),
+			fyne.NewSize(120, widget.NewLabel("Load Type*").MinSize().Height+mp.loadType.MinSize().Height),
 			container.NewVBox(
 				widget.NewLabel("Load Type*"),
-				loadType,
+				mp.loadType,
 			),
 		),
 		container.NewGridWrap(
@@ -236,23 +350,23 @@ func createParamsSection() *fyne.Container {
 	)
 }
 
-func createCertFields(window fyne.Window) *fyne.Container {
-	certPathEntry = widget.NewEntry()
-	certPathEntry.SetPlaceHolder("Путь к сертификату")
-	certPathEntry.Disable()
+func (mp *ControlPage) createCertFields(window fyne.Window) *fyne.Container {
+	mp.certPathEntry = widget.NewEntry()
+	mp.certPathEntry.SetPlaceHolder("Путь к сертификату")
+	mp.certPathEntry.Disable()
 
-	certKeyPathEntry = widget.NewEntry()
-	certKeyPathEntry.SetPlaceHolder("Путь к ключу")
-	certKeyPathEntry.Disable()
+	mp.certKeyPathEntry = widget.NewEntry()
+	mp.certKeyPathEntry.SetPlaceHolder("Путь к ключу")
+	mp.certKeyPathEntry.Disable()
 
 	certLabel := widget.NewLabel("Не выбрано")
 	keyLabel := widget.NewLabel("Не выбрано")
 
 	certFilter := storage.NewExtensionFileFilter([]string{".crt", ".pem"})
-	selectCertButton := widget.NewButton("Выбрать сертификат", func() {
+	mp.selectCertButton = widget.NewButton("Выбрать сертификат", func() {
 		fileDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err == nil && reader != nil {
-				certPathEntry.SetText(reader.URI().Path())
+				mp.certPathEntry.SetText(reader.URI().Path())
 				certLabel.SetText(reader.URI().Name())
 				reader.Close()
 			}
@@ -262,10 +376,10 @@ func createCertFields(window fyne.Window) *fyne.Container {
 	})
 
 	keyFilter := storage.NewExtensionFileFilter([]string{".key"})
-	selectKeyButton := widget.NewButton("Выбрать ключ", func() {
+	mp.selectKeyButton = widget.NewButton("Выбрать ключ", func() {
 		fileDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err == nil && reader != nil {
-				certKeyPathEntry.SetText(reader.URI().Path())
+				mp.certKeyPathEntry.SetText(reader.URI().Path())
 				keyLabel.SetText(reader.URI().Name())
 				reader.Close()
 			}
@@ -275,8 +389,8 @@ func createCertFields(window fyne.Window) *fyne.Container {
 	})
 
 	certAccordion := widget.NewAccordion(widget.NewAccordionItem("Сертификаты", container.NewVBox(
-		container.NewHBox(selectCertButton, certLabel),
-		container.NewHBox(selectKeyButton, keyLabel),
+		container.NewHBox(mp.selectCertButton, certLabel),
+		container.NewHBox(mp.selectKeyButton, keyLabel),
 	)))
 
 	return container.NewVBox(certAccordion)

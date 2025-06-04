@@ -35,6 +35,7 @@ type LoadTestUI struct {
 	progressText    *widget.Label
 	chartsContainer *fyne.Container // Добавляем поле для контейнера с графиками
 	uiUpdaterOnce   sync.Once
+	mp              *ControlPage
 }
 
 type uiUpdate struct {
@@ -207,17 +208,17 @@ func (ui *LoadTestUI) setupStartButton() {
 		default:
 		}
 
-		reqCountVal, err := parseInt(reqCount.Text)
+		reqCountVal, err := parseInt(ui.mp.reqCount.Text)
 		if err != nil {
 			ui.resetOnError(fmt.Errorf("invalid request count: %v", err))
 			return
 		}
-		if _, err := parseInt(duration.Text); err != nil {
+		if _, err := parseInt(ui.mp.duration.Text); err != nil {
 			ui.resetOnError(fmt.Errorf("invalid duration: %v", err))
 			return
 		}
 
-		if urlEntry.Text == "" {
+		if ui.mp.urlEntry.Text == "" {
 			ui.resetOnError(fmt.Errorf("URL is required"))
 			return
 		}
@@ -336,14 +337,11 @@ func (ui *LoadTestUI) setupStartButton() {
 
 			// Формирование итогового вывода
 			var resultOutput bytes.Buffer
-			resultOutput.WriteString("=== Результаты теста ===\n")
 			for _, metric := range metrics {
 				resultOutput.WriteString(fmt.Sprintf("%s: %.2fms\n", metric.Name, metric.Duration))
 			}
-			resultOutput.WriteString("\n=== Итоговые метрики ===\n")
 			resultOutput.WriteString(fmt.Sprintf("Общее время: %.2fсек\n", time.Since(startTime).Seconds()))
 			resultOutput.WriteString(fmt.Sprintf("Среднее время запроса: %.2fms\n", totalDuration/float64(reqCountVal)))
-			resultOutput.WriteString(fmt.Sprintf("Всего запросов: %d\n", reqCountVal))
 
 			avgDuration := totalDuration / 1000.0 / float64(reqCountVal)
 			finalProgressText := fmt.Sprintf("Request Avg Duration %.3fs", avgDuration)

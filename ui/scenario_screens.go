@@ -33,7 +33,7 @@ func (mp *ControlPage) createScenariosScreen(window fyne.Window, tabs *container
 			Description: "Полный цикл работы с пользователями (CRUD)",
 		},
 		{
-			Name:        "Auth Stress Test",
+			Name:        "Auth Test",
 			CreatedAt:   time.Date(2025, 5, 10, 9, 15, 0, 0, time.UTC),
 			Description: "Тестирование нагрузки на эндпоинты аутентификации",
 		},

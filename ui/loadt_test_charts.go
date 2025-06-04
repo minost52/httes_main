@@ -252,3 +252,192 @@ func widgetSeparator() *canvas.Line {
 	sep.StrokeWidth = 1
 	return sep
 }
+
+// func toChartColor(c color.Color) drawing.Color {
+// 	r, g, b, a := c.RGBA()
+// 	return drawing.Color{
+// 		R: uint8(r >> 8),
+// 		G: uint8(g >> 8),
+// 		B: uint8(b >> 8),
+// 		A: uint8(a >> 8),
+// 	}
+// }
+
+// type chartWidget struct {
+// 	renderer *chartRenderer
+// 	mu       sync.Mutex
+// 	title    string
+// 	width    int
+// 	height   int
+// }
+
+// func newChartWidget(title string, lineColor color.Color, width, height int) *chartWidget {
+// 	c := &chartWidget{
+// 		title:  title,
+// 		width:  width,
+// 		height: height,
+// 	}
+
+// 	// Создаем базовый график с белой темой
+// 	graph := chart.Chart{
+// 		Width:  width,
+// 		Height: height,
+// 		Background: chart.Style{
+// 			FillColor: drawing.Color{R: 255, G: 255, B: 255, A: 255}, // Белый фон
+// 		},
+// 		Canvas: chart.Style{
+// 			FillColor: drawing.Color{R: 255, G: 255, B: 255, A: 255}, // Белый фон канвы
+// 		},
+// 		XAxis: chart.XAxis{
+// 			Style: chart.Style{
+// 				FontColor:   drawing.Color{R: 50, G: 50, B: 50, A: 255},    // Тёмно-серый текст
+// 				StrokeColor: drawing.Color{R: 150, G: 150, B: 150, A: 255}, // Серый цвет осей
+// 			},
+// 		},
+// 		YAxis: chart.YAxis{
+// 			Name: title,
+// 			Style: chart.Style{
+// 				FontColor:   drawing.Color{R: 50, G: 50, B: 50, A: 255},    // Тёмно-серый текст
+// 				StrokeColor: drawing.Color{R: 150, G: 150, B: 150, A: 255}, // Серый цвет осей
+// 			},
+// 		},
+// 	}
+
+// 	img := canvas.NewImageFromResource(nil)
+// 	img.FillMode = canvas.ImageFillOriginal
+// 	img.SetMinSize(fyne.NewSize(float32(width), float32(height)))
+
+// 	c.renderer = &chartRenderer{
+// 		chart: &graph,
+// 		img:   img,
+// 	}
+
+// 	// Первоначальный рендер
+// 	c.update([]float64{0, 1}, []float64{0, 0}, lineColor)
+// 	return c
+// }
+
+// // hasAllZeros проверяет, все ли значения в массиве равны нулю
+// func hasAllZeros(values []float64) bool {
+// 	for _, v := range values {
+// 		if v != 0 {
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
+
+// func (c *chartWidget) update(x, y []float64, lineColor color.Color) {
+// 	c.mu.Lock()
+// 	defer c.mu.Unlock()
+
+// 	// Если данные пустые, создаем нулевые значения
+// 	if len(x) == 0 {
+// 		x = []float64{0, 1} // Минимальный временной диапазон
+// 	}
+// 	if len(y) == 0 {
+// 		y = make([]float64, len(x)) // Заполняем нулями
+// 	}
+
+// 	// Убираем фиксированные диапазоны для автомасштабирования
+// 	c.renderer.chart.XAxis.Range = nil
+// 	c.renderer.chart.YAxis.Range = nil
+
+// 	// Основная серия данных
+// 	mainSeries := chart.ContinuousSeries{
+// 		XValues: x,
+// 		YValues: y,
+// 		Style: chart.Style{
+// 			StrokeColor: toChartColor(lineColor),
+// 			StrokeWidth: 2,
+// 		},
+// 	}
+
+// 	// Проверяем, есть ли ненулевые значения в данных
+// 	hasNonZero := false
+// 	for _, val := range y {
+// 		if val != 0 {
+// 			hasNonZero = true
+// 			break
+// 		}
+// 	}
+
+// 	// Если все значения Y равны нулю, принудительно устанавливаем диапазон Y
+// 	if !hasNonZero {
+// 		// Для всех графиков устанавливаем одинаковый диапазон вокруг нуля
+// 		c.renderer.chart.YAxis.Range = &chart.ContinuousRange{
+// 			Min: -0.1,
+// 			Max: 0.5,
+// 		}
+
+// 		// Для графика ошибок добавляем точки на линии для лучшей видимости
+// 		if c.title == "Errors" {
+// 			mainSeries.Style.DotWidth = 3
+// 			mainSeries.Style.DotColor = toChartColor(lineColor)
+// 		}
+// 	}
+
+// 	c.renderer.chart.Series = []chart.Series{mainSeries}
+// 	c.renderer.render()
+// }
+
+// func (c *chartWidget) getImage() *canvas.Image {
+// 	return c.renderer.img
+// }
+
+// func CreateLoadTestCharts() fyne.CanvasObject {
+// 	chartWidth := 300
+// 	chartHeight := 200
+
+// 	// Создаем виджеты графиков
+// 	rpsChart := newChartWidget("RPS", color.NRGBA{R: 255, G: 0, B: 0, A: 255}, chartWidth, chartHeight)                // Красный
+// 	durationChart := newChartWidget("Duration (ms)", color.NRGBA{R: 0, G: 128, B: 0, A: 255}, chartWidth, chartHeight) // Зелёный
+// 	errorChart := newChartWidget("Errors", color.NRGBA{R: 0, G: 0, B: 255, A: 255}, chartWidth, chartHeight)           // Синий
+
+// 	// Первоначальное обновление
+// 	GlobalMetrics.mu.RLock()
+// 	rpsChart.update(GlobalMetrics.Times, GlobalMetrics.RPS, color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+// 	durationChart.update(GlobalMetrics.Times, GlobalMetrics.RespTimes, color.NRGBA{R: 0, G: 128, B: 0, A: 255})
+// 	errorChart.update(GlobalMetrics.Times, GlobalMetrics.Errors, color.NRGBA{R: 0, G: 0, B: 255, A: 255})
+// 	GlobalMetrics.mu.RUnlock()
+
+// 	// Запускаем обработчик обновлений
+// 	go func() {
+// 		for range GlobalMetrics.updateChan {
+// 			GlobalMetrics.mu.RLock()
+// 			rpsChart.update(GlobalMetrics.Times, GlobalMetrics.RPS, color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+// 			durationChart.update(GlobalMetrics.Times, GlobalMetrics.RespTimes, color.NRGBA{R: 0, G: 128, B: 0, A: 255})
+// 			errorChart.update(GlobalMetrics.Times, GlobalMetrics.Errors, color.NRGBA{R: 0, G: 0, B: 255, A: 255})
+// 			GlobalMetrics.mu.RUnlock()
+// 		}
+// 	}()
+
+// 	return container.NewVBox(
+// 		container.NewVBox(
+// 			newChartTitle("График RPS"),
+// 			rpsChart.getImage(),
+// 		),
+// 		widgetSeparator(),
+// 		container.NewVBox(
+// 			newChartTitle("График времени отклика"),
+// 			durationChart.getImage(),
+// 		),
+// 		widgetSeparator(),
+// 		container.NewVBox(
+// 			newChartTitle("График ошибок"),
+// 			errorChart.getImage(),
+// 		),
+// 	)
+// }
+
+// func newChartTitle(text string) *canvas.Text {
+// 	title := canvas.NewText(text, color.NRGBA{R: 50, G: 50, B: 50, A: 255}) // Тёмно-серый текст
+// 	title.TextSize = 12
+// 	return title
+// }
+
+// func widgetSeparator() *canvas.Line {
+// 	sep := canvas.NewLine(color.NRGBA{R: 200, G: 200, B: 200, A: 255}) // Светло-серый разделитель
+// 	sep.StrokeWidth = 1
+// 	return sep
+// }

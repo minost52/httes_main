@@ -12,7 +12,7 @@ import (
 
 func main() {
 	myApp := app.New()
-	myApp.Settings().SetTheme(theme.DarkTheme())
+	myApp.Settings().SetTheme(theme.LightTheme())
 	window := myApp.NewWindow("Httes")
 
 	// Загружаем иконку

@@ -18,6 +18,20 @@ type ControlPage struct {
 	role            string // Поле для роли пользователя (developer или intern)
 	icon            fyne.Resource
 	chartsContainer fyne.CanvasObject // Контейнер для графиков
+	// Поля для виджетов
+	methodSelect     *widget.Select
+	protocolSelect   *widget.Select
+	urlEntry         *widget.Entry
+	proxyEntry       *widget.Entry
+	reqCount         *widget.Entry
+	duration         *widget.Entry
+	loadType         *widget.RadioGroup
+	usernameEntry    *widget.Entry
+	passwordEntry    *widget.Entry
+	certPathEntry    *widget.Entry
+	certKeyPathEntry *widget.Entry
+	selectCertButton *widget.Button
+	selectKeyButton  *widget.Button
 }
 
 // NewMainPage создаёт новый экземпляр MainPage.
